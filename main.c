@@ -74,7 +74,7 @@ int state_transition(int *neighbors)
     }
 
     int rule[RULE_SIZE];
-    decode_rule(rule, 90);
+    decode_rule(rule, choosen_rule);
 
     return rule[rule_index];
 }
@@ -190,28 +190,40 @@ int main()
             case SDL_QUIT:
                 window_open = 0;
                 break;
-                // case SDL_KEYDOWN:
-                //     Uint8 *keys = SDL_GetKeyboardState(NULL);
-
-                //     if (keys[SDL_SCANCODE_UP] == 1)
-                //     {
-                //         choosen_rule++;
-                //     }
-                //     //      else if (keys[SDL_SCANCODE_S] == 1)
-                //     //         m_direction = Direction::DOWN;
-                //     // else if (keys[SDL_SCANCODE_A] == 1)
-                //     //     m_direction = Direction::LEFT;
-                //     // else if (keys[SDL_SCANCODE_D] == 1)
-                //     //     m_direction = Direction::RIGHT;
-                //     break;
-            }
-
-            for (int row = 0; row < CELLS_IN_COLUMN; row++)
+            case SDL_KEYDOWN:
             {
-                draw_cells(&context, row, cells);
-                SDL_UpdateWindowSurface(context.window);
-                SDL_Delay(1);
-                next_state(cells);
+                const Uint8 *keys = SDL_GetKeyboardState(NULL);
+                if (keys[SDL_SCANCODE_UP] == 1)
+                {
+                    choosen_rule = (choosen_rule + 1) % 256;
+                    for (int i = 0; i < CELLS_IN_ROW; i++)
+                    {
+                        cells[i] = 0;
+                    }
+                    cells[CELLS_IN_ROW / 2] = 1;
+                    printf("choosen rule: %d\n", choosen_rule);
+                }
+                else if (keys[SDL_SCANCODE_DOWN] == 1)
+                {
+                    choosen_rule = (choosen_rule - 1) % 256;
+                    for (int i = 0; i < CELLS_IN_ROW; i++)
+                    {
+                        cells[i] = 0;
+                    }
+                    cells[CELLS_IN_ROW / 2] = 1;
+                    printf("choosen rule: %d\n", choosen_rule);
+                }
+                else if (keys[SDL_SCANCODE_RIGHT] == 1)
+                {
+                    for (int row = 0; row < CELLS_IN_COLUMN; row++)
+                    {
+                        draw_cells(&context, row, cells);
+                        SDL_UpdateWindowSurface(context.window);
+                        next_state(cells);
+                    }
+                }
+                break;
+            }
             }
         }
     }
