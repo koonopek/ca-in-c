@@ -16,19 +16,20 @@
 struct Context
 {
     SDL_Window *window;
-    SDL_Surface *window_surface;
+    SDL_Renderer *window_renderer;
 };
 
 void clear_context(struct Context *context)
 {
-    if (context->window_surface != NULL)
+    if (context->window_renderer != NULL)
     {
-        SDL_FreeSurface(context->window_surface);
+        SDL_RenderClear(context->window_renderer);
     }
     if (context->window != NULL)
     {
         SDL_DestroyWindow(context->window);
     }
+    SDL_Quit();
 }
 
 void exit_with_failure(char *error_message, struct Context *context)
@@ -39,20 +40,9 @@ void exit_with_failure(char *error_message, struct Context *context)
     exit(FAILED_STATUS);
 }
 
-void draw_rect(struct Context *context, SDL_Rect *rect, Uint32 color)
-{
-    int status = SDL_FillRect(context->window_surface, rect, color);
-    if (status < 0)
-    {
-        printf("ERROR: Failed to draw rect: %s \n", SDL_GetError());
-        clear_context(context);
-        exit(status);
-    }
-}
-
 #define NEIGHBORS_COUNT 3
 #define RULE_SIZE 8
-int choosen_rule = 0;
+int choosen_rule = 90;
 
 void decode_rule(int *rule, int rule_id)
 {
@@ -81,7 +71,7 @@ int state_transition(int *neighbors)
 
 // selecting 3 neighbors
 // don't modify edges
-void next_state(int *cells_current_state)
+void next_state_1d(int *cells_current_state)
 {
     int new_state[CELLS_IN_ROW];
 
@@ -99,28 +89,6 @@ void next_state(int *cells_current_state)
     }
 }
 
-Uint32 rgb(struct Context *context, Uint8 r, Uint8 g, Uint8 b)
-{
-    return SDL_MapRGB(context->window_surface->format, r, g, b);
-}
-
-Uint32 cell_derive_color(struct Context *context, int cell_state)
-{
-    if (cell_state == 0)
-    {
-        // black
-        return rgb(context, 0, 0, 0);
-    }
-    else if (cell_state == 1)
-    {
-        // white
-        return rgb(context, 255, 255, 255);
-    }
-    exit_with_failure("cell state should be 0 or 1", context);
-
-    return -1;
-}
-
 void draw_cell(struct Context *context, int row, int column, int cell_state)
 {
     struct SDL_Rect rect;
@@ -131,9 +99,31 @@ void draw_cell(struct Context *context, int row, int column, int cell_state)
     rect.x = column * CELL_W;
     rect.y = row * CELL_H;
 
-    Uint32 color = cell_derive_color(context, cell_state);
+    if (cell_state == 1)
+    {
+        // black
+        if (SDL_SetRenderDrawColor(context->window_renderer, 255, 255, 255, 255) < 0)
+        {
+            exit_with_failure("ERROR: failed to StRenderDrawColor", context);
+        };
+    }
+    else if (cell_state == 0)
+    {
+        // white
+        if (SDL_SetRenderDrawColor(context->window_renderer, 0, 0, 0, 255) < 0)
+        {
+            exit_with_failure("ERROR: failed to StRenderDrawColor", context);
+        };
+    }
+    else
+    {
+        exit_with_failure("cell state should be 0 or 1", context);
+    }
 
-    draw_rect(context, &rect, color);
+    if (SDL_RenderFillRect(context->window_renderer, &rect) < 0)
+    {
+        exit_with_failure("ERROR: failed to RenderFillRect", context);
+    };
 }
 
 void draw_cells(struct Context *context, int row, int *cells)
@@ -148,7 +138,7 @@ int main()
 {
     struct Context context;
     context.window = NULL;
-    context.window_surface = NULL;
+    context.window_renderer = NULL;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
@@ -162,22 +152,21 @@ int main()
         exit_with_failure("ERROR: Failed to create window: ", &context);
     }
 
-    context.window_surface = SDL_GetWindowSurface(context.window);
+    context.window_renderer = SDL_CreateRenderer(context.window, -1, SDL_RENDERER_ACCELERATED);
 
-    if (context.window_surface == NULL)
+    if (context.window_renderer == NULL)
     {
-        exit_with_failure("ERROR: Failed to get surface of window: ", &context);
+        exit_with_failure("ERROR: Failed to get renderer: ", &context);
     }
 
-    if (SDL_UpdateWindowSurface(context.window) < 0)
+    if (SDL_RenderClear(context.window_renderer) < 0)
     {
-        exit_with_failure("ERROR: Failed to update window surface: ", &context);
+        exit_with_failure("ERROR: Failed to clear renderer: ", &context);
     }
 
+    // init cells - 1D
     int cells[CELLS_IN_ROW] = {0};
     cells[CELLS_IN_ROW / 2] = 1;
-
-    // draw CA
 
     char window_open = 1;
     while (window_open)
@@ -215,12 +204,14 @@ int main()
                 }
                 else if (keys[SDL_SCANCODE_RIGHT] == 1)
                 {
+
+                    SDL_RenderClear(context.window_renderer);
                     for (int row = 0; row < CELLS_IN_COLUMN; row++)
                     {
                         draw_cells(&context, row, cells);
-                        SDL_UpdateWindowSurface(context.window);
-                        next_state(cells);
+                        next_state_1d(cells);
                     }
+                    SDL_RenderPresent(context.window_renderer);
                 }
                 break;
             }
